@@ -1,0 +1,699 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tide Calculator - Sailing Religion</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Leaflet for the map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Chart.js for the tide graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: #003366;
+            color: #fff;
+            font-family: 'Montserrat', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .splash {
+            position: fixed;
+            top:0; left:0; right:0; bottom:0;
+            background: #003366;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 1s;
+        }
+        .splash-logo {
+            width: 90px;
+            height: 90px;
+            margin-bottom: 24px;
+        }
+        .splash-title {
+            font-size: 2em;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #00BFFF;
+            margin-bottom: 12px;
+        }
+        .splash-sub {
+            color: #fff;
+            font-size: 1.1em;
+            opacity: 0.8;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            background: #002244;
+            padding: 12px 20px;
+        }
+        .logo {
+            width: 40px;
+            height: 40px;
+            margin-right: 14px;
+        }
+        .title {
+            font-size: 1.3em;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 18px auto;
+            background: #f2f2f2;
+            color: #003366;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            padding: 18px 12px 12px 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 18px;
+        }
+        #map {
+            width: 100%;
+            min-height: 340px;
+            height: 340px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+        }
+        .sidebar {
+            flex: 1 1 260px;
+            min-width: 260px;
+            max-width: 340px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom: 12px;
+        }
+        .main-content {
+            flex: 2 1 400px;
+            min-width: 320px;
+        }
+        .input-group {
+            margin-bottom: 14px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="date"], input[type="time"], input[type="number"] {
+            width: 100%;
+            padding: 7px;
+            border-radius: 6px;
+            border: 1px solid #00BFFF;
+            font-size: 1em;
+            margin-bottom: 4px;
+        }
+        .location-btn {
+            background: #2ECC71;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .location-btn:hover {
+            background: #27AE60;
+        }
+        .status-text {
+            display: block;
+            font-size: 0.95em;
+            margin-top: 4px;
+            color: #666;
+        }
+        .location-name {
+            margin-top: 8px;
+            padding: 8px;
+            background: #eaf6fb;
+            border-radius: 6px;
+            font-size: 1.05em;
+            color: #003366;
+            display: none;
+            line-height: 1.4;
+        }
+        .port-list {
+            margin-top: 10px;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .port-item {
+            padding: 7px 0;
+            border-bottom: 1px solid #eaf6fb;
+            cursor: pointer;
+        }
+        .port-item:last-child { border-bottom: none; }
+        .port-item.selected {
+            background: #00BFFF;
+            color: #fff;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .chart-container {
+            margin-top: 18px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .note {
+            margin-top: 18px;
+            font-size: 0.98em;
+            color: #003366;
+            background: #eaf6fb;
+            border-left: 4px solid #00BFFF;
+            padding: 10px 16px;
+            border-radius: 6px;
+        }
+        .footer {
+            text-align: center;
+            margin: 32px 0 12px 0;
+            color: #fff;
+            font-size: 1em;
+            opacity: 0.8;
+        }
+        @media (max-width: 900px) {
+            .container { flex-direction: column; }
+            .sidebar, .main-content { max-width: 100%; }
+        }
+        @media (max-width: 700px) {
+            .container { margin: 8px 2px; padding: 8px 2px 8px 2px; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .logo { margin-bottom: 8px; }
+            #map { min-height: 220px; height: 220px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div class="splash" id="splashScreen">
+        <svg class="splash-logo" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="30" fill="#00BFFF" stroke="#fff" stroke-width="4"/>
+            <polygon points="32,10 44,54 32,44 20,54" fill="#fff" stroke="#003366" stroke-width="2"/>
+            <circle cx="32" cy="32" r="6" fill="#003366"/>
+        </svg>
+        <div class="splash-title">Sailing Religion</div>
+        <div class="splash-sub">Tide Calculator & Navigation Companion</div>
+    </div>
+    <!-- Header -->
+    <div class="header">
+        <svg class="logo" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="30" fill="#00BFFF" stroke="#fff" stroke-width="4"/>
+            <polygon points="32,10 44,54 32,44 20,54" fill="#fff" stroke="#003366" stroke-width="2"/>
+            <circle cx="32" cy="32" r="6" fill="#003366"/>
+        </svg>
+        <span class="title">Tide Calculator</span>
+    </div>
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Sidebar: Location, Date/Time, Port List -->
+        <div class="sidebar">
+            <button type="button" id="detectLocation" class="location-btn">
+                📍 Detect My Location
+            </button>
+            <span id="locationStatus" class="status-text"></span>
+            <div id="locationName" class="location-name"></div>
+            <div class="input-group">
+                <label for="latitude">Latitude:</label>
+                <input type="number" id="latitude" name="latitude" step="any" required>
+            </div>
+            <div class="input-group">
+                <label for="longitude">Longitude:</label>
+                <input type="number" id="longitude" name="longitude" step="any" required>
+            </div>
+            <div class="input-group">
+                <label for="date">Date:</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            <div class="input-group">
+                <label for="time">Time (local):</label>
+                <input type="time" id="time" name="time" required>
+            </div>
+            <div class="input-group">
+                <label>Nearby Ports & Anchorages:</label>
+                <div class="port-list" id="portList"></div>
+            </div>
+        </div>
+        <!-- Main Content: Map and Tide Chart -->
+        <div class="main-content">
+            <div id="map"></div>
+            <div class="chart-container" style="display:none;">
+                <canvas id="tideChart" height="220"></canvas>
+            </div>
+            <div class="note">
+                <b>Note:</b> This calculator uses a simple harmonic model for educational purposes. For professional navigation, always consult official sources and updated nautical charts. Sailing Religion is not responsible for the use of this data in critical situations.
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        &copy; 2024 Sailing Religion | Inspiring passion for the sea
+    </div>
+    <script>
+        // --- Splash Screen ---
+        window.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                document.getElementById('splashScreen').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('splashScreen').style.display = 'none';
+                }, 1000);
+            }, 1800);
+        });
+
+        // --- Example Port Database (expand as needed) ---
+        const ports = [// América del Norte y Caribe
+    { name: "Miami Harbor", lat: 25.7781, lon: -80.1794 },
+    { name: "Key West", lat: 24.5551, lon: -81.7800 },
+    { name: "Fort Lauderdale", lat: 26.1224, lon: -80.1373 },
+    { name: "Annapolis", lat: 38.9784, lon: -76.4922 },
+    { name: "Newport", lat: 41.4901, lon: -71.3128 },
+    { name: "Marina del Rey", lat: 33.9761, lon: -118.4514 },
+    { name: "San Diego", lat: 32.7157, lon: -117.1611 },
+    { name: "San Francisco Bay", lat: 37.8067, lon: -122.4658 },
+    { name: "Vancouver", lat: 49.2827, lon: -123.1207 },
+    { name: "Toronto", lat: 43.6510, lon: -79.3470 },
+    { name: "Nassau", lat: 25.0600, lon: -77.3450 },
+    { name: "Bimini", lat: 25.7280, lon: -79.2970 },
+    { name: "Freeport", lat: 26.5333, lon: -78.7000 },
+    { name: "Exumas", lat: 23.6167, lon: -75.9667 },
+    { name: "St. Thomas", lat: 18.3381, lon: -64.9407 },
+    { name: "St. Martin", lat: 18.0708, lon: -63.0501 },
+    { name: "Tortola", lat: 18.4286, lon: -64.6185 },
+    { name: "Antigua", lat: 17.1274, lon: -61.8468 },
+    { name: "St. Lucia", lat: 13.9094, lon: -60.9789 },
+    { name: "Grenada", lat: 12.0561, lon: -61.7486 },
+    { name: "Martinique", lat: 14.6415, lon: -61.0242 },
+    { name: "Guadeloupe", lat: 16.2650, lon: -61.5510 },
+    { name: "Puerto Rico (San Juan)", lat: 18.4655, lon: -66.1057 },
+    { name: "La Habana", lat: 23.1136, lon: -82.3666 },
+    { name: "Cancún", lat: 21.1619, lon: -86.8515 },
+    { name: "Mérida", lat: 21.1619, lon: -89.0720 },
+    { name: "Isla Mujeres", lat: 21.2329, lon: -86.7317 },
+    { name: "Cozumel", lat: 20.5100, lon: -86.9500 },
+    { name: "Belize City", lat: 17.5046, lon: -88.1962 },
+    { name: "Roatán", lat: 16.3142, lon: -86.5370 },
+
+    // Sudamérica
+    { name: "Buenos Aires", lat: -34.6037, lon: -58.3816 },
+    { name: "Rio de la Plata", lat: -35.0, lon: -57.5 },
+    { name: "Punta del Este", lat: -34.9670, lon: -54.9510 },
+    { name: "Mar del Plata", lat: -38.0055, lon: -57.5426 },
+    { name: "Valparaíso", lat: -33.0472, lon: -71.6127 },
+    { name: "Puerto Montt", lat: -41.4717, lon: -72.9369 },
+    { name: "Ilhabela", lat: -23.7784, lon: -45.3581 },
+    { name: "Angra dos Reis", lat: -23.0067, lon: -44.3181 },
+    { name: "Paraty", lat: -23.2221, lon: -44.7176 },
+    { name: "Salvador de Bahia", lat: -12.9777, lon: -38.5016 },
+    { name: "Recife", lat: -8.0476, lon: -34.8770 },
+
+    // Europa Mediterráneo
+    { name: "Barcelona", lat: 41.3851, lon: 2.1734 },
+    { name: "Valencia", lat: 39.4667, lon: -0.3750 },
+    { name: "Palma de Mallorca", lat: 39.5696, lon: 2.6502 },
+    { name: "Ibiza", lat: 38.9088, lon: 1.4321 },
+    { name: "Alicante", lat: 38.3452, lon: -0.4810 },
+    { name: "Cartagena", lat: 37.6050, lon: -0.9867 },
+    { name: "Málaga", lat: 36.7213, lon: -4.4214 },
+    { name: "Marbella", lat: 36.5101, lon: -4.8825 },
+    { name: "Cádiz", lat: 36.5297, lon: -6.2924 },
+    { name: "Lisboa", lat: 38.7223, lon: -9.1393 },
+    { name: "Portimão", lat: 37.1360, lon: -8.5382 },
+    { name: "Cascais", lat: 38.6979, lon: -9.4201 },
+    { name: "Saint-Tropez", lat: 43.2672, lon: 6.6400 },
+    { name: "Cannes", lat: 43.5528, lon: 7.0174 },
+    { name: "Nice", lat: 43.7102, lon: 7.2620 },
+    { name: "Monaco", lat: 43.7384, lon: 7.4246 },
+    { name: "Génova", lat: 44.4056, lon: 8.9463 },
+    { name: "La Spezia", lat: 44.1025, lon: 9.8241 },
+    { name: "Portofino", lat: 44.3031, lon: 9.2094 },
+    { name: "Civitavecchia", lat: 42.0924, lon: 11.7960 },
+    { name: "Roma (Ostia)", lat: 41.7325, lon: 12.2766 },
+    { name: "Nápoles", lat: 40.8518, lon: 14.2681 },
+    { name: "Palermo", lat: 38.1157, lon: 13.3615 },
+    { name: "Cagliari", lat: 39.2238, lon: 9.1217 },
+    { name: "Corfú", lat: 39.6243, lon: 19.9217 },
+    { name: "Atenas (Pireo)", lat: 37.9420, lon: 23.6465 },
+    { name: "Mykonos", lat: 37.4467, lon: 25.3289 },
+    { name: "Santorini", lat: 36.3932, lon: 25.4615 },
+    { name: "Kos", lat: 36.8937, lon: 27.2877 },
+    { name: "Split", lat: 43.5081, lon: 16.4402 },
+    { name: "Dubrovnik", lat: 42.6507, lon: 18.0944 },
+    { name: "Kotor", lat: 42.4247, lon: 18.7712 },
+    { name: "Valletta", lat: 35.8989, lon: 14.5146 },
+
+    // Europa Atlántico y Norte
+    { name: "La Rochelle", lat: 46.1603, lon: -1.1511 },
+    { name: "Brest", lat: 48.3904, lon: -4.4861 },
+    { name: "Saint-Malo", lat: 48.6493, lon: -2.0257 },
+    { name: "Cherbourg", lat: 49.6337, lon: -1.6221 },
+    { name: "Southampton", lat: 50.9097, lon: -1.4044 },
+    { name: "Portsmouth", lat: 50.7989, lon: -1.0912 },
+    { name: "Plymouth", lat: 50.3755, lon: -4.1427 },
+    { name: "Falmouth", lat: 50.1540, lon: -5.0711 },
+    { name: "Dublin", lat: 53.3498, lon: -6.2603 },
+    { name: "Cork", lat: 51.8985, lon: -8.4756 },
+    { name: "Amsterdam", lat: 52.3702, lon: 4.8952 },
+    { name: "Rotterdam", lat: 51.9225, lon: 4.4792 },
+    { name: "Hamburgo", lat: 53.5511, lon: 9.9937 },
+    { name: "Kiel", lat: 54.3233, lon: 10.1228 },
+    { name: "Oslo", lat: 59.9139, lon: 10.7522 },
+    { name: "Stockholm", lat: 59.3293, lon: 18.0686 },
+    { name: "Helsinki", lat: 60.1699, lon: 24.9384 },
+    { name: "Copenhague", lat: 55.6761, lon: 12.5683 },
+
+    // África y Oriente Medio
+    { name: "Ciudad del Cabo", lat: -33.9249, lon: 18.4241 },
+    { name: "Durban", lat: -29.8587, lon: 31.0218 },
+    { name: "El Cairo (Alejandría)", lat: 31.2001, lon: 29.9187 },
+    { name: "Tánger", lat: 35.7595, lon: -5.8339 },
+    { name: "Casablanca", lat: 33.5731, lon: -7.5898 },
+    { name: "Dubái", lat: 25.2048, lon: 55.2708 },
+
+    // Asia y Pacífico
+    { name: "Phuket", lat: 7.8804, lon: 98.3923 },
+    { name: "Langkawi", lat: 6.3528, lon: 99.7782 },
+    { name: "Singapur", lat: 1.3521, lon: 103.8198 },
+    { name: "Hong Kong", lat: 22.3193, lon: 114.1694 },
+    { name: "Auckland", lat: -36.8485, lon: 174.7633 },
+    { name: "Sydney", lat: -33.8688, lon: 151.2093 },
+    { name: "Brisbane", lat: -27.4698, lon: 153.0251 },
+    { name: "Melbourne", lat: -37.8136, lon: 144.9631 },
+    { name: "Nouméa", lat: -22.2758, lon: 166.4580 },
+    { name: "Papeete (Tahiti)", lat: -17.5516, lon: -149.5585 },
+    { name: "Honolulu", lat: 21.3069, lon: -157.8583 },
+    { name: "San Juan (Puerto Rico)", lat: 18.4655, lon: -66.1057 }
+];
+    
+        // --- Map Initialization ---
+        let map, userMarker, portMarkers = [];
+        let selectedPort = null;
+        function initMap(lat, lon) {
+    if (!map) {
+        map = L.map('map').setView([lat, lon], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Evento: clic en el mapa para seleccionar cualquier punto
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lon = e.latlng.lng;
+            document.getElementById('latitude').value = lat.toFixed(6);
+            document.getElementById('longitude').value = lon.toFixed(6);
+            if (userMarker) map.removeLayer(userMarker);
+            userMarker = L.marker([lat, lon], {title: "Selected Location"}).addTo(map);
+            showTideChart(lat, lon);
+        });
+
+        // Permite calcular marea al editar manualmente los campos
+        document.getElementById('latitude').addEventListener('change', function() {
+            const lat = parseFloat(this.value);
+            const lon = parseFloat(document.getElementById('longitude').value);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                map.setView([lat, lon], 13);
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker([lat, lon], {title: "Manual Location"}).addTo(map);
+                showTideChart(lat, lon);
+            }
+        });
+        document.getElementById('longitude').addEventListener('change', function() {
+            const lat = parseFloat(document.getElementById('latitude').value);
+            const lon = parseFloat(this.value);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                map.setView([lat, lon], 13);
+                if (userMarker) map.removeLayer(userMarker);
+                userMarker = L.marker([lat, lon], {title: "Manual Location"}).addTo(map);
+                showTideChart(lat, lon);
+            }
+        });
+    } else {
+        map.setView([lat, lon], 13);
+    }
+}
+                  
+
+        // --- Port List and Markers ---
+        function updatePortList(lat, lon) {
+            // Sort ports by distance
+            ports.forEach(p => {
+                p.dist = getDistance(lat, lon, p.lat, p.lon);
+            });
+            ports.sort((a, b) => a.dist - b.dist);
+
+            // Update list
+            const portList = document.getElementById('portList');
+            portList.innerHTML = '';
+            ports.forEach((p, idx) => {
+                const div = document.createElement('div');
+                div.className = 'port-item' + (selectedPort && selectedPort.name === p.name ? ' selected' : '');
+                div.innerHTML = `${p.name} <span style="float:right;">${p.dist.toFixed(1)} NM</span>`;
+                div.onclick = () => {
+                    selectedPort = p;
+                    updatePortList(lat, lon);
+                    map.setView([p.lat, p.lon], 10);
+                    showTideChart(p.lat, p.lon);
+                    highlightPortMarker(p.name);
+                    // Actualiza los campos de lat/lon
+                    document.getElementById('latitude').value = p.lat.toFixed(6);
+                    document.getElementById('longitude').value = p.lon.toFixed(6);
+                };
+                portList.appendChild(div);
+            });
+
+            // Update markers
+            portMarkers.forEach(m => map.removeLayer(m));
+            portMarkers = [];
+            ports.forEach((p, idx) => {
+                const marker = L.marker([p.lat, p.lon], {
+                    title: p.name,
+                    icon: L.icon({
+                        iconUrl: "https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/images/marker-icon.png",
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34]
+                    })
+                }).addTo(map);
+                marker.on('click', () => {
+                    selectedPort = p;
+                    updatePortList(lat, lon);
+                    showTideChart(p.lat, p.lon);
+                    // Actualiza los campos de lat/lon
+                    document.getElementById('latitude').value = p.lat.toFixed(6);
+                    document.getElementById('longitude').value = p.lon.toFixed(6);
+                });
+                portMarkers.push(marker);
+            });
+        }
+
+        function highlightPortMarker(name) {
+            portMarkers.forEach(m => {
+                if (m.options.title === name) {
+                    m.setZIndexOffset(1000);
+                    m.openPopup();
+                } else {
+                    m.setZIndexOffset(0);
+                    m.closePopup();
+                }
+            });
+        }
+
+        // --- Distance Calculation (Nautical Miles) ---
+        function getDistance(lat1, lon1, lat2, lon2) {
+            function toRad(x) { return x * Math.PI / 180; }
+            const R = 3440; // Nautical miles
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // --- Tide Calculation (Educational Model) ---
+        function calculateTide(t, lat) {
+            const amplitude = 1.2 + 0.2 * Math.cos(lat * Math.PI / 180);
+            const phase = 0;
+            const period = 12.42;
+            return amplitude * Math.sin(2 * Math.PI * t / period + phase);
+        }
+
+        function showTideChart(lat, lon) {
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            if (!date || !time) return;
+            const labels = [];
+            const data = [];
+            let t0 = parseInt(time.split(":")[0]) + parseInt(time.split(":")[1])/60;
+            for (let i = 0; i <= 24; i++) {
+                let t = (t0 + i) % 24;
+                labels.push(((t < 10) ? "0" : "") + Math.floor(t) + ":00");
+                data.push(calculateTide(t, lat));
+            }
+            if (window.tideChartObj) window.tideChartObj.destroy();
+            const ctx = document.getElementById('tideChart').getContext('2d');
+            window.tideChartObj = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Tide level (m)',
+                        data: data,
+                        borderColor: '#00BFFF',
+                        backgroundColor: 'rgba(0,191,255,0.15)',
+                        pointRadius: 3,
+                        pointBackgroundColor: '#003366',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Tide prediction for the next 24 hours',
+                            color: '#003366',
+                            font: { size: 18, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Local time', color: '#003366', font: { size: 14 } },
+                            ticks: { color: '#003366' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Height (m)', color: '#003366', font: { size: 14 } },
+                            ticks: { color: '#003366' },
+                            grid: { color: '#eaf6fb' }
+                        }
+                    }
+                }
+            });
+            document.querySelector('.chart-container').style.display = 'block';
+        }
+
+        // --- Date/Time Defaults ---
+        window.onload = function() {
+            const now = new Date();
+            document.getElementById('date').value = now.toISOString().slice(0,10);
+            let h = now.getHours(), m = now.getMinutes();
+            document.getElementById('time').value = (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+        }
+
+        // --- Detect Location and Place Name ---
+        document.getElementById('detectLocation').addEventListener('click', function() {
+            const statusElement = document.getElementById('locationStatus');
+            const locationNameElement = document.getElementById('locationName');
+            statusElement.textContent = '';
+            locationNameElement.style.display = 'none';
+
+            if (!navigator.geolocation) {
+                statusElement.textContent = '❌ Your device does not support geolocation';
+                return;
+            }
+
+            statusElement.textContent = '🔍 Detecting location...';
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    statusElement.textContent = '✅ Location detected!';
+                    // Center map and update user marker
+                    map.setView([lat, lon], 13);
+                    initMap(lat, lon);
+                    if (userMarker) map.removeLayer(userMarker);
+                    userMarker = L.marker([lat, lon], {title: "Your Location"}).addTo(map);
+                    document.getElementById('latitude').value = lat.toFixed(6);
+                    document.getElementById('longitude').value = lon.toFixed(6);
+                    // Update port list and markers
+                    updatePortList(lat, lon);
+                    // Get place name using OpenStreetMap Nominatim
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
+                        .then(response => response.json())
+                        .then(data => {
+                            let locationText = '';
+                            if (data.address) {
+                                const addr = data.address;
+                                if (addr.water || addr.bay || addr.harbour) {
+                                    locationText += `📍 ${addr.water || addr.bay || addr.harbour}`;
+                                }
+                                if (addr.city || addr.town) {
+                                    locationText += `\n🏢 ${addr.city || addr.town}`;
+                                }
+                                if (addr.state) {
+                                    locationText += `\n📌 ${addr.state}`;
+                                }
+                                if (addr.country) {
+                                    locationText += `\n🌎 ${addr.country}`;
+                                }
+                            }
+                            if (!locationText) {
+                                locationText = `📍 Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°`;
+                            }
+                            locationNameElement.innerHTML = locationText.replace(/\n/g, '<br>');
+                            locationNameElement.style.display = 'block';
+                        })
+                        .catch(error => {
+                            locationNameElement.innerHTML = `📍 Lat: ${lat.toFixed(4)}°, Lon: ${lon.toFixed(4)}°`;
+                            locationNameElement.style.display = 'block';
+                        });
+                    // Show tide chart for user location
+                    showTideChart(lat, lon);
+                },
+                function(error) {
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            statusElement.textContent = '❌ Permission denied to access location';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            statusElement.textContent = '❌ Location information unavailable';
+                            break;
+                        case error.TIMEOUT:
+                            statusElement.textContent = '❌ Timeout while getting location';
+                            break;
+                        default:
+                            statusElement.textContent = '❌ Unknown error while getting location';
+                    }
+                    locationNameElement.style.display = 'none';
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        });
+
+        // --- Map and Port List Initialization on First Load ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Default: Miami
+            const defaultLat = 25.7617, defaultLon = -80.1918;
+            initMap(defaultLat, defaultLon);
+            updatePortList(defaultLat, defaultLon);
+            showTideChart(defaultLat, defaultLon);
+        });
+
+        // --- Update Chart on Date/Time Change ---
+        document.getElementById('date').addEventListener('change', function() {
+            const lat = parseFloat(document.getElementById('latitude').value);
+            const lon = parseFloat(document.getElementById('longitude').value);
+            showTideChart(lat, lon);
+        });
+        document.getElementById('time').addEventListener('change', function() {
+            const lat = parseFloat(document.getElementById('latitude').value);
+            const lon = parseFloat(document.getElementById('longitude').value);
+            showTideChart(lat, lon);
+        });
+    </script>
+</body>
+</html>
